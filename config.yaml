@@ -1,0 +1,37 @@
+# clay-commute configuration
+# Edit this file to customize your locations
+
+# Home location (your starting point)
+home:
+  name: "Home"
+  lat: 38.2097   # Shelbyville, KY
+  lon: -85.2172
+
+# Common destinations
+destinations:
+  work:
+    name: "Work"
+    lat: 38.1989
+    lon: -85.3245
+    address: "Downtown Louisville"
+  
+  school:
+    name: "Silas's School"
+    lat: 38.1856
+    lon: -85.3890
+    address: "Louisville"
+  
+  iris_school:
+    name: "Iris's School"
+    lat: 38.2120
+    lon: -85.2015
+    address: "Shelbyville"
+  
+  walmart:
+    name: "Walmart"
+    lat: 38.2156
+    lon: -85.2689
+    address: "Shelbyville"
+
+# Default destination when running `clay_commute.py check` without args
+default_destination: work
