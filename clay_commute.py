@@ -117,7 +117,7 @@ def get_route_time(lat1, lon1, lat2, lon2):
         return None, None, str(e)
 
 
-def get_traffic_estimate(duration_minutes, at_hour=None):
+def get_traffic_estimate(duration_minutes, at_hour=None, conservative=False):
     """
     Estimate traffic condition based on time of day.
     This is a simple heuristic - real traffic data requires paid APIs.
@@ -125,6 +125,10 @@ def get_traffic_estimate(duration_minutes, at_hour=None):
     at_hour: the hour of day the trip will actually happen (0-23). Defaults to
     the current hour. Passing the departure hour matters: checking a commute
     at 6 AM for a 7:45 AM arrival should not assume off-peak conditions.
+
+    conservative: use the worst case of the traffic band instead of a random
+    draw. Departure deadlines must be deterministic -- a leave-by time that
+    changes between runs is worse than no leave-by time at all.
     """
     from datetime import datetime
     import random
@@ -135,10 +139,10 @@ def get_traffic_estimate(duration_minutes, at_hour=None):
     # Typical commute hours
     if 7 <= hour <= 9:
         # Morning rush - typically 1.2-1.5x longer
-        factor = 1.3 + (random.random() * 0.2)
+        factor = 1.5 if conservative else 1.3 + (random.random() * 0.2)
     elif 16 <= hour <= 18:
         # Evening rush - typically 1.2-1.6x longer
-        factor = 1.4 + (random.random() * 0.2)
+        factor = 1.6 if conservative else 1.4 + (random.random() * 0.2)
     elif 10 <= hour <= 15:
         # Midday - slightly more traffic
         factor = 1.1
@@ -330,7 +334,7 @@ def leave_by(config, destination_key, arrive_by_iso, json_output=False):
             # Binary-search-ish: find the largest departure offset that fits.
             pass
         hours = {depart.hour, (depart + timedelta(minutes=duration)).hour}
-        factor = max(get_traffic_estimate(duration, h)[1] for h in hours)
+        factor = max(get_traffic_estimate(duration, h, conservative=True)[1] for h in hours)
         trip_minutes = duration * factor
         if trip_minutes <= minutes_earlier:
             best_departure = (depart, factor, trip_minutes)
@@ -339,7 +343,7 @@ def leave_by(config, destination_key, arrive_by_iso, json_output=False):
     if best_departure is None:
         # Even a departure 3h early is tight -- report the earliest candidate.
         depart = arrive_by - timedelta(minutes=180)
-        factor = get_traffic_estimate(duration, depart.hour)[1]
+        factor = get_traffic_estimate(duration, depart.hour, conservative=True)[1]
         best_departure = (depart, factor, duration * factor)
 
     depart, factor, trip_minutes = best_departure
