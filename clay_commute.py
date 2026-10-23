@@ -302,21 +302,69 @@ def check_all_commutes(config, json_output=False):
             print(f"    Base: {format_duration(r['base_duration_minutes'])} | {r['distance_km']} km")
 
 
-def leave_by(config, destination_key, arrive_by_iso, json_output=False):
+def resolve_origin(config, origin_key):
+    """
+    Resolve an origin for a trip. Accepts:
+      - 'home'  -> the configured home coordinates
+      - a destination key -> that destination's coordinates
+      - 'current' -> live position from Home Assistant (device_tracker.robbs_iphone)
+    Returns (lat, lon, label, error).
+    """
+    destinations = config.get('destinations', {})
+    home = config.get('home', {})
+
+    if origin_key in (None, 'home'):
+        return home.get('lat'), home.get('lon'), home.get('name', 'Home'), None
+
+    if origin_key == 'current':
+        try:
+            import ssl
+            import urllib.request as ur
+            secret = Path(__file__).resolve().parents[2] / ".secrets" / "ha-token"
+            if not secret.exists():
+                return None, None, None, "No HA token at .secrets/ha-token"
+            token = secret.read_text().strip()
+            req = ur.Request(
+                "http://192.168.1.135:8123/api/states/device_tracker.robbs_iphone",
+                headers={'Authorization': 'Bearer ' + token})
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            with ur.urlopen(req, timeout=10, context=ctx) as resp:
+                state = json.loads(resp.read().decode('utf-8'))
+            attrs = state.get('attributes', {})
+            return attrs.get('latitude'), attrs.get('longitude'), "current location", None
+        except Exception as e:
+            return None, None, None, f"Could not read current position: {e}"
+
+    if origin_key in destinations:
+        d = destinations[origin_key]
+        return d.get('lat'), d.get('lon'), d.get('name', origin_key), None
+
+    return None, None, None, (
+        f"Unknown origin '{origin_key}'. Use 'home', 'current', or one of: "
+        f"{', '.join(destinations.keys())}")
+
+
+def leave_by(config, destination_key, arrive_by_iso, json_output=False, origin_key='home'):
     """Work out the latest departure time to arrive by a given ISO timestamp."""
     from datetime import datetime, timedelta
 
     destinations = config.get('destinations', {})
-    home = config.get('home', {})
 
     if destination_key not in destinations:
         print(f"Error: Unknown destination '{destination_key}'", file=sys.stderr)
         print(f"Available: {', '.join(destinations.keys())}", file=sys.stderr)
         sys.exit(1)
 
+    o_lat, o_lon, o_label, o_err = resolve_origin(config, origin_key)
+    if o_err:
+        print(f"Error resolving origin: {o_err}", file=sys.stderr)
+        sys.exit(1)
+
     dest = destinations[destination_key]
     duration, distance, error = get_route_time(
-        home.get('lat'), home.get('lon'), dest.get('lat'), dest.get('lon'))
+        o_lat, o_lon, dest.get('lat'), dest.get('lon'))
 
     if error:
         print(f"Error getting route: {error}", file=sys.stderr)
@@ -349,6 +397,8 @@ def leave_by(config, destination_key, arrive_by_iso, json_output=False):
     depart, factor, trip_minutes = best_departure
     result = {
         "success": True,
+        "origin": origin_key,
+        "origin_name": o_label,
         "destination": destination_key,
         "destination_name": dest.get('name'),
         "destination_address": dest.get('address', ''),
@@ -364,7 +414,7 @@ def leave_by(config, destination_key, arrive_by_iso, json_output=False):
     if json_output:
         print(json.dumps(result, indent=2))
     else:
-        print(f"🚗 {dest.get('name')} ({dest.get('address','')})")
+        print(f"🚗 {o_label} → {dest.get('name')} ({dest.get('address','')})")
         print(f"   Arrive by:  {arrive_by.strftime('%a %b %-d, %-I:%M %p')}")
         print(f"   Leave by:   {depart.strftime('%a %b %-d, %-I:%M %p')}")
         print(f"   Drive time: {format_duration(trip_minutes)} (base {format_duration(duration)}, {result['traffic_factor']}x traffic)")
@@ -394,6 +444,13 @@ def main():
         help='Arrival time in ISO format, e.g. 2026-10-23T07:45 (for leave-by)'
     )
     parser.add_argument(
+        '--from', '-f',
+        dest='origin',
+        default='home',
+        help="Origin for leave-by: 'home' (default), 'current' (live HA position), "
+             "or a destination key like 'ferguson'"
+    )
+    parser.add_argument(
         '--json', '-j',
         action='store_true',
         help='Output as JSON'
@@ -413,7 +470,7 @@ def main():
             print("Error: leave-by needs a destination and an arrival time", file=sys.stderr)
             print('Usage: clay_commute.py leave-by "work" "2026-10-23T07:45"', file=sys.stderr)
             sys.exit(1)
-        leave_by(config, args.destination, args.arrive_by, args.json)
+        leave_by(config, args.destination, args.arrive_by, args.json, args.origin)
 
 
 if __name__ == '__main__':

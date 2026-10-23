@@ -33,11 +33,34 @@ destinations:
     lon: -85.2689
     address: "Shelbyville"
 
+  # Ferguson Plumbing Supply #0185 - Louisville (Robb's work site)
+  # Verified via ferguson.com/store/ky/louisville/plumbingpvf-0185
+  ferguson:
+    name: "Ferguson #0185 Louisville"
+    lat: 38.1775767
+    lon: -85.6913307
+    address: "4700 Poplar Level Road, Louisville, KY 40213-2402"
+    hours: "Mon-Fri 0700-1630"
+
+  # Downtown Georgetown, KY - separate town east of Louisville.
+  # Do NOT confuse with the Ferguson store above; they are ~30 min apart.
   georgetown:
-    name: "Ferguson Georgetown"
+    name: "Downtown Georgetown"
     lat: 38.2055
     lon: -84.5597
     address: "Downtown Georgetown, KY"
+
+  # Henry County Park & Recreation - New Castle, KY (Iris soccer, fall league).
+  # "Henry Co Parks" on the calendar resolves to the county recreation complex
+  # off Park Rd in New Castle, north of Shelbyville. Geocoded via ArcGIS:
+  # Park Rd New Castle (38.44538, -85.16847) + Henry County Health Department
+  # POI (38.44646, -85.16965) -- both sit on the same Park Rd campus, so the
+  # park fields are within ~200m of either point. Use 38.4459, -85.1690.
+  henry_park:
+    name: "Henry County Park"
+    lat: 38.4459
+    lon: -85.1690
+    address: "Park Rd, New Castle, KY 40050"
 
 # Default destination when running `clay_commute.py check` without args
 default_destination: work
