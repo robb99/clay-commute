@@ -33,5 +33,11 @@ destinations:
     lon: -85.2689
     address: "Shelbyville"
 
+  georgetown:
+    name: "Ferguson Georgetown"
+    lat: 38.2055
+    lon: -84.5597
+    address: "Downtown Georgetown, KY"
+
 # Default destination when running `clay_commute.py check` without args
 default_destination: work

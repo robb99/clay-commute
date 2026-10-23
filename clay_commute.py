@@ -7,6 +7,7 @@ Usage:
     python3 clay_commute.py check             # Check commute to default destination
     python3 clay_commute.py check "name"      # Check specific destination
     python3 clay_commute.py all               # Check all destinations
+    python3 clay_commute.py leave-by "name" "2026-10-23T07:45"  # Latest departure to arrive by a time
     python3 clay_commute.py --json            # JSON output (combine with above)
 """
 
@@ -17,7 +18,9 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
-CONFIG_PATH = Path(__file__).parent / "config.yaml"
+# Resolve symlinks so the tool finds config.yaml next to the real script,
+# not next to the symlink in tools/ (which would be a different file).
+CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
 
 # Default configuration (Shelbyville, KY area)
 DEFAULT_CONFIG = {
@@ -50,6 +53,12 @@ DEFAULT_CONFIG = {
             "lat": 38.2156,
             "lon": -85.2689,
             "address": " Shelbyville"
+        },
+        "georgetown": {
+            "name": "Ferguson Georgetown",
+            "lat": 38.2055,
+            "lon": -84.5597,
+            "address": "Downtown Georgetown, KY"
         }
     },
     "default_destination": "work"
@@ -108,16 +117,20 @@ def get_route_time(lat1, lon1, lat2, lon2):
         return None, None, str(e)
 
 
-def get_traffic_estimate(duration_minutes):
+def get_traffic_estimate(duration_minutes, at_hour=None):
     """
     Estimate traffic condition based on time of day.
     This is a simple heuristic - real traffic data requires paid APIs.
+
+    at_hour: the hour of day the trip will actually happen (0-23). Defaults to
+    the current hour. Passing the departure hour matters: checking a commute
+    at 6 AM for a 7:45 AM arrival should not assume off-peak conditions.
     """
     from datetime import datetime
     import random
     
     now = datetime.now()
-    hour = now.hour
+    hour = now.hour if at_hour is None else int(at_hour)
     
     # Typical commute hours
     if 7 <= hour <= 9:
@@ -285,6 +298,76 @@ def check_all_commutes(config, json_output=False):
             print(f"    Base: {format_duration(r['base_duration_minutes'])} | {r['distance_km']} km")
 
 
+def leave_by(config, destination_key, arrive_by_iso, json_output=False):
+    """Work out the latest departure time to arrive by a given ISO timestamp."""
+    from datetime import datetime, timedelta
+
+    destinations = config.get('destinations', {})
+    home = config.get('home', {})
+
+    if destination_key not in destinations:
+        print(f"Error: Unknown destination '{destination_key}'", file=sys.stderr)
+        print(f"Available: {', '.join(destinations.keys())}", file=sys.stderr)
+        sys.exit(1)
+
+    dest = destinations[destination_key]
+    duration, distance, error = get_route_time(
+        home.get('lat'), home.get('lon'), dest.get('lat'), dest.get('lon'))
+
+    if error:
+        print(f"Error getting route: {error}", file=sys.stderr)
+        sys.exit(1)
+
+    arrive_by = datetime.fromisoformat(arrive_by_iso)
+
+    # The trip spans departure -> arrival, so pick the worst traffic factor
+    # across the hours it covers rather than just the departure hour.
+    best_departure = None
+    for minutes_earlier in range(0, 180):
+        depart = arrive_by - timedelta(minutes=minutes_earlier)
+        # Base case: is the base drive time enough on its own?
+        if minutes_earlier == 0:
+            # Binary-search-ish: find the largest departure offset that fits.
+            pass
+        hours = {depart.hour, (depart + timedelta(minutes=duration)).hour}
+        factor = max(get_traffic_estimate(duration, h)[1] for h in hours)
+        trip_minutes = duration * factor
+        if trip_minutes <= minutes_earlier:
+            best_departure = (depart, factor, trip_minutes)
+            break
+
+    if best_departure is None:
+        # Even a departure 3h early is tight -- report the earliest candidate.
+        depart = arrive_by - timedelta(minutes=180)
+        factor = get_traffic_estimate(duration, depart.hour)[1]
+        best_departure = (depart, factor, duration * factor)
+
+    depart, factor, trip_minutes = best_departure
+    result = {
+        "success": True,
+        "destination": destination_key,
+        "destination_name": dest.get('name'),
+        "destination_address": dest.get('address', ''),
+        "arrive_by": arrive_by.isoformat(),
+        "leave_by": depart.isoformat(),
+        "base_duration_minutes": duration,
+        "distance_km": distance,
+        "traffic_factor": round(factor, 2),
+        "estimated_duration_minutes": round(trip_minutes, 1),
+        "buffer_minutes": round((arrive_by - depart).total_seconds() / 60 - trip_minutes, 1),
+    }
+
+    if json_output:
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"🚗 {dest.get('name')} ({dest.get('address','')})")
+        print(f"   Arrive by:  {arrive_by.strftime('%a %b %-d, %-I:%M %p')}")
+        print(f"   Leave by:   {depart.strftime('%a %b %-d, %-I:%M %p')}")
+        print(f"   Drive time: {format_duration(trip_minutes)} (base {format_duration(duration)}, {result['traffic_factor']}x traffic)")
+        print(f"   Distance:   {distance} km")
+        print(f"   Buffer:     {result['buffer_minutes']:.0f} min spare")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='clay-commute - Check commute times and traffic conditions'
@@ -292,7 +375,7 @@ def main():
     parser.add_argument(
         'command',
         nargs='?',
-        choices=['list', 'check', 'all'],
+        choices=['list', 'check', 'all', 'leave-by'],
         default='check',
         help='Command to run'
     )
@@ -300,6 +383,11 @@ def main():
         'destination',
         nargs='?',
         help='Destination key (for check command)'
+    )
+    parser.add_argument(
+        'arrive_by',
+        nargs='?',
+        help='Arrival time in ISO format, e.g. 2026-10-23T07:45 (for leave-by)'
     )
     parser.add_argument(
         '--json', '-j',
@@ -316,6 +404,12 @@ def main():
         check_commute(config, args.destination, args.json)
     elif args.command == 'all':
         check_all_commutes(config, args.json)
+    elif args.command == 'leave-by':
+        if not args.destination or not args.arrive_by:
+            print("Error: leave-by needs a destination and an arrival time", file=sys.stderr)
+            print('Usage: clay_commute.py leave-by "work" "2026-10-23T07:45"', file=sys.stderr)
+            sys.exit(1)
+        leave_by(config, args.destination, args.arrive_by, args.json)
 
 
 if __name__ == '__main__':
