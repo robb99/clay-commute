@@ -4,8 +4,11 @@
 # Home location (your starting point)
 home:
   name: "Home"
-  lat: 38.2097   # Shelbyville, KY
-  lon: -85.2172
+  # 814 Abingdon Cir, Shelbyville KY 40065 (reverse-geocodes exactly).
+  # CORRECTED 2026-10-23 16:19: the old 38.2097 was ~3.7 km north
+  # (527 Bradshaw St). It shrank home->Brent Park by ~2.6 min.
+  lat: 38.17645
+  lon: -85.21712
 
 # Common destinations
 destinations:
@@ -67,6 +70,32 @@ destinations:
     lat: 38.4460013
     lon: -85.1722306
     address: "325 Park Rd, New Castle, KY 40050"
+
+  # Kason's birthday party - La Grange Community Center.
+  # Geocoded from "307 West Jefferson St, La Grange KY" (reverse-geocodes
+  # to "La Grange Community Center"). Verified 2026-10-23.
+  la_grange:
+    name: "La Grange Community Center"
+    lat: 38.407596
+    lon: -85.381955
+    address: "307 W Jefferson St, La Grange, KY"
+
+  # Eminence, KY - home of the Eminence fall festival.
+  # Nominatim + ArcGIS agree. Verified 2026-10-23.
+  eminence:
+    name: "Eminence, KY"
+    lat: 38.37007
+    lon: -85.18051
+    address: "Eminence, KY"
+
+  # Xtool - Sunday 2026-10-25 10:00 event, "7307 Glen Arbor Rd, Louisville
+  # KY 40222". Verified 2026-10-23. This is ~9.8 km from the Rte 2251
+  # strip where Rob parked at lunch on 10-23 - do NOT conflate them.
+  xtool:
+    name: "Xtool (Glen Arbor Rd)"
+    lat: 38.27882
+    lon: -85.61639
+    address: "7307 Glen Arbor Rd, Louisville, KY 40222"
 
 # Default destination when running `clay_commute.py check` without args
 default_destination: work

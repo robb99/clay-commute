@@ -25,8 +25,8 @@ CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
 # Default configuration (Shelbyville, KY area)
 DEFAULT_CONFIG = {
     "home": {
-        "lat": 38.2097,
-        "lon": -85.2172,
+        "lat": 38.17645,
+        "lon": -85.21712,
         "name": "Home"
     },
     "destinations": {
