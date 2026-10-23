@@ -50,17 +50,23 @@ destinations:
     lon: -84.5597
     address: "Downtown Georgetown, KY"
 
-  # Henry County Park & Recreation - New Castle, KY (Iris soccer, fall league).
-  # "Henry Co Parks" on the calendar resolves to the county recreation complex
-  # off Park Rd in New Castle, north of Shelbyville. Geocoded via ArcGIS:
-  # Park Rd New Castle (38.44538, -85.16847) + Henry County Health Department
-  # POI (38.44646, -85.16965) -- both sit on the same Park Rd campus, so the
-  # park fields are within ~200m of either point. Use 38.4459, -85.1690.
+  # Henry County Youth Soccer - John Logan Brent Park, New Castle, KY.
+  # "Henry Co Parks" on the calendar = this park. Verified 2026-10-23:
+  #  - Henry County Parks dept page (henrycounty.ky.gov/Departments/Pages/
+  #    Parks.aspx) names "The John Logan Brent Park includes soccer and
+  #    football fields" + the Michael Brent playground + Buchanan Splash Pad.
+  #  - Henry County Youth Soccer Association plays its home games here.
+  #  - Coordinates taken from the Google Maps POIs inside this park:
+  #    Buchanan Splash Pad (325 Park Rd) 38.4460013, -85.1722306 and
+  #    Michael Brent Playground 38.4459804, -85.1719003 (same campus).
+  # NOTE: "Harry Hill Park" (311 Castle Hwy, 38.4095941, -85.1697203) is a
+  # different county park 4.1 km away -- it is the Little League baseball
+  # home, not the soccer fields. Do not substitute it.
   henry_park:
-    name: "Henry County Park"
-    lat: 38.4459
-    lon: -85.1690
-    address: "Park Rd, New Castle, KY 40050"
+    name: "John Logan Brent Park (Henry Co Soccer)"
+    lat: 38.4460013
+    lon: -85.1722306
+    address: "325 Park Rd, New Castle, KY 40050"
 
 # Default destination when running `clay_commute.py check` without args
 default_destination: work
